@@ -1,7 +1,10 @@
-from setuptools import setup, find_packages
-from distutils.extension import Extension
-from Cython.Build import cythonize
-from Cython.Distutils import build_ext
+from setuptools import setup, find_packages, Extension
+from Cython.Build import cythonize, build_ext
+# from setuptools import find_packages
+# from distutils.extension import Extension
+# from distutils.core import setup
+# from Cython.Build import cythonize
+# from Cython.Distutils import build_ext
 
 extensions = [
     Extension("my_test", ["flair/models/resolve_char_ids.pyx"])
