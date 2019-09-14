@@ -10,6 +10,8 @@ from torch.optim import Optimizer
 
 import flair
 from flair.data import Dictionary
+import pyximport
+pyximport.install()
 from flair.models.resolve_char_ids import check
 
 
