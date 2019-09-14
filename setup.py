@@ -1,4 +1,11 @@
 from setuptools import setup, find_packages
+from distutils.extension import Extension
+from Cython.Build import cythonize
+from Cython.Distutils import build_ext
+
+extensions = [
+    Extension("my_test", ["flair/models/resolve_char_ids.pyx"])
+]
 
 with open("requirements.txt") as f:
     required = f.read().splitlines()
@@ -17,4 +24,6 @@ setup(
     install_requires=required,
     include_package_data=True,
     python_requires=">=3.6",
+    cmdclass={'build_ext': build_ext, "extra_compile_args": ["03"]},
+    ext_modules=cythonize(extensions),
 )

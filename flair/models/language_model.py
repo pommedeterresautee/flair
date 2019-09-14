@@ -10,6 +10,7 @@ from torch.optim import Optimizer
 
 import flair
 from flair.data import Dictionary
+from flair.models.resolve_char_ids import check
 
 
 class LanguageModel(nn.Module):
@@ -117,12 +118,12 @@ class LanguageModel(nn.Module):
         # push each chunk through the RNN language model
         for chunk in chunks:
 
-            sequences_as_char_indices: List[List[int]] = []
-            for string in chunk:
-                char_indices = [
-                    self.dictionary.get_idx_for_item(char) for char in string
-                ]
-                sequences_as_char_indices.append(char_indices)
+            sequences_as_char_indices: List[List[int]] = check(self.dictionary.item2idx, chunk)
+            # for string in chunk:
+            #     char_indices = [
+            #         self.dictionary.get_idx_for_item(char) for char in string
+            #     ]
+            #     sequences_as_char_indices.append(char_indices)
 
             batch = torch.tensor(
                 sequences_as_char_indices, dtype=torch.long, device=flair.device
