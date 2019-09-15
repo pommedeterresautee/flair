@@ -128,7 +128,7 @@ class LanguageModel(nn.Module):
                 sequences_as_char_indices, dtype=torch.long, device=flair.device
             ).transpose(0, 1)
 
-            prediction, rnn_output, hidden = self.forward(batch, hidden)
+            _, rnn_output, hidden = self.forward(batch, hidden)
 
             output_parts.append(rnn_output)
 

@@ -1827,7 +1827,6 @@ class FlairEmbeddings(TokenEmbeddings):
 
             # pad strings with whitespaces to longest sentence
             sentences_padded: List[str] = []
-            append_padded_sentence = sentences_padded.append
 
             start_marker = "\n"
 
@@ -1839,12 +1838,11 @@ class FlairEmbeddings(TokenEmbeddings):
                     padded = "{}{}{}{}".format(
                         start_marker, sentence_text, end_marker, pad_by * " "
                     )
-                    append_padded_sentence(padded)
                 else:
                     padded = "{}{}{}{}".format(
                         start_marker, sentence_text[::-1], end_marker, pad_by * " "
                     )
-                    append_padded_sentence(padded)
+                sentences_padded.append(padded)
 
             # get hidden states from language model
             all_hidden_states_in_lm = self.lm.get_representation(

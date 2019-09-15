@@ -206,7 +206,7 @@ class Token(DataPoint):
         )
 
         self.sentence: Sentence = None
-        self._embeddings: Dict = {}
+        self._embeddings: Dict[str, Callable[[], torch.tensor]] = {}
         self.tags: Dict[str, Label] = {}
         self.tags_proba_dist: Dict[str, List[Label]] = {}
 
@@ -233,19 +233,22 @@ class Token(DataPoint):
     def get_head(self):
         return self.sentence.get_token(self.head_id)
 
-    def set_embedding(self, name: str, vector: torch.tensor):
+    def set_embedding(self, name: str, vector: Union[torch.tensor, Callable]):
         device = flair.device
         if len(self._embeddings.keys()) > 0:
-            device = next(iter(self._embeddings.values())).device
+            device = next(iter(self._embeddings.values()))().device
         if device != vector.device:
             vector = vector.to(device)
-        self._embeddings[name] = vector
+        if type(vector) is torch.Tensor:
+            self._embeddings[name] = lambda : vector
+        elif type(vector) is function:
+            self._embeddings[name] = vector
 
     def to(self, device: str, pin_memory: bool = False):
         for name, vector in self._embeddings.items():
-            if str(vector.device) != str(device):
+            if str(vector().device) != str(device):
                 if pin_memory:
-                    self._embeddings[name] = vector.to(
+                    self._embeddings[name] = vector().to(
                         device, non_blocking=True
                     ).pin_memory()
                 else:
@@ -260,11 +263,11 @@ class Token(DataPoint):
                     del self._embeddings[name]
 
     def get_each_embedding(self) -> torch.tensor:
-        return [self._embeddings[embed] for embed in sorted(self._embeddings.keys())]
+        return [self._embeddings[embed]() for embed in sorted(self._embeddings.keys())]
 
     def get_embedding(self) -> torch.tensor:
         embeddings = [
-            self._embeddings[embed] for embed in sorted(self._embeddings.keys())
+            self._embeddings[embed]() for embed in sorted(self._embeddings.keys())
         ]
 
         if embeddings:
@@ -273,7 +276,7 @@ class Token(DataPoint):
         return torch.tensor([], device=flair.device)
 
     def get_subembedding(self, names: List[str]) -> torch.tensor:
-        embeddings = [self._embeddings[embed] for embed in sorted(names)]
+        embeddings = [self._embeddings[embed]() for embed in sorted(names)]
 
         if embeddings:
             return torch.cat(embeddings, dim=0)
