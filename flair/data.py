@@ -234,15 +234,24 @@ class Token(DataPoint):
         return self.sentence.get_token(self.head_id)
 
     def set_embedding(self, name: str, vector: Union[torch.tensor, Callable]):
-        device = flair.device
-        if len(self._embeddings.keys()) > 0:
-            device = next(iter(self._embeddings.values()))().device
-        if device != vector.device:
-            vector = vector.to(device)
-        if type(vector) is torch.Tensor:
-            self._embeddings[name] = lambda : vector
-        elif type(vector) is function:
+        if callable(vector):
             self._embeddings[name] = vector
+        elif type(vector) is torch.Tensor:
+            # TODO reintroduce code to move to right device
+            self._embeddings[name] = lambda: vector
+        else:
+            raise Exception("unsupported vector type")
+
+    # def set_embedding(self, name: str, vector: Union[torch.tensor, Callable]):
+    #     device = flair.device
+    #     if len(self._embeddings.keys()) > 0:
+    #         device = next(iter(self._embeddings.values()))().device
+    #     if device != vector().device:
+    #         vector = vector.to(device)
+    #     if type(vector) is torch.Tensor:
+    #         self._embeddings[name] = lambda : vector
+    #     elif type(vector) is function:
+    #         self._embeddings[name] = vector
 
     def to(self, device: str, pin_memory: bool = False):
         for name, vector in self._embeddings.items():

@@ -1815,13 +1815,111 @@ class FlairEmbeddings(TokenEmbeddings):
 
     def _add_embeddings_internal(self, sentences: List[Sentence]) -> List[Sentence]:
 
+        state = StoreState(model=self, sentences=sentences)
+        for index_sentence, sentence in enumerate(sentences):
+            for index_token, token in enumerate(sentence.tokens):
+                def promise():
+                    return state.get_token_embedding(index_sentence, index_token)
+
+                token.set_embedding(self.name, promise)
+
+        # # gradients are enable if fine-tuning is enabled
+        # gradient_context = torch.enable_grad() if self.fine_tune else torch.no_grad()
+        #
+        # with gradient_context:
+        #
+        #     # if this is not possible, use LM to generate embedding. First, get text sentences
+        #     text_sentences = [sentence.to_tokenized_string() for sentence in sentences]
+        #
+        #     longest_character_sequence_in_batch: int = len(max(text_sentences, key=len))
+        #
+        #     # pad strings with whitespaces to longest sentence
+        #     sentences_padded: List[str] = []
+        #
+        #     start_marker = "\n"
+        #
+        #     end_marker = " "
+        #     extra_offset = len(start_marker)
+        #     for sentence_text in text_sentences:
+        #         pad_by = longest_character_sequence_in_batch - len(sentence_text)
+        #         if self.is_forward_lm:
+        #             padded = "{}{}{}{}".format(
+        #                 start_marker, sentence_text, end_marker, pad_by * " "
+        #             )
+        #         else:
+        #             padded = "{}{}{}{}".format(
+        #                 start_marker, sentence_text[::-1], end_marker, pad_by * " "
+        #             )
+        #         sentences_padded.append(padded)
+        #
+        #     # get hidden states from language model
+        #     all_hidden_states_in_lm = self.lm.get_representation(
+        #         sentences_padded, self.chars_per_chunk
+        #     )
+        #
+        #     # take first or last hidden states from language model as word representation
+        #     for i, sentence in enumerate(sentences):
+        #         sentence_text = sentence.to_tokenized_string()
+        #
+        #         offset_forward: int = extra_offset
+        #         offset_backward: int = len(sentence_text) + extra_offset
+        #
+        #         for token in sentence.tokens:
+        #
+        #             offset_forward += len(token.text)
+        #
+        #             if self.is_forward_lm:
+        #                 offset = offset_forward
+        #             else:
+        #                 offset = offset_backward
+        #
+        #             embedding = all_hidden_states_in_lm[offset, i, :]
+        #
+        #             # if self.tokenized_lm or token.whitespace_after:
+        #             offset_forward += 1
+        #             offset_backward -= 1
+        #
+        #             offset_backward -= len(token.text)
+        #
+        #             if not self.fine_tune:
+        #                 embedding = embedding.detach()
+        #
+        #             # only clone if optimization mode is 'gpu'
+        #             if flair.embedding_storage_mode == "gpu":
+        #                 embedding = embedding.clone()
+        #
+        #             token.set_embedding(self.name, embedding)
+        #
+        #     del all_hidden_states_in_lm
+        #
+        # return sentences
+
+    def __str__(self):
+        return self.name
+
+
+class StoreState:
+    def __init__(self, model: FlairEmbeddings, sentences: List[Sentence]):
+        self.model: FlairEmbeddings = model
+        self.sentences = sentences
+        self.sentences_tokens: List[List[torch.tensor]] = list()
+
+    def get_token_embedding(self, index_sentence: int, index_token: int) -> torch.Tensor:
+        if not self.sentences_tokens:
+            self.perform()
+            self.model = None
+            self.sentences = None
+        return self.sentences_tokens[index_sentence][index_token]
+
+    def perform(self) -> None:
+
         # gradients are enable if fine-tuning is enabled
-        gradient_context = torch.enable_grad() if self.fine_tune else torch.no_grad()
+        gradient_context = torch.enable_grad() if self.model.fine_tune else torch.no_grad()
 
         with gradient_context:
 
             # if this is not possible, use LM to generate embedding. First, get text sentences
-            text_sentences = [sentence.to_tokenized_string() for sentence in sentences]
+            text_sentences = [sentence.to_tokenized_string() for sentence in self.sentences]
 
             longest_character_sequence_in_batch: int = len(max(text_sentences, key=len))
 
@@ -1834,7 +1932,7 @@ class FlairEmbeddings(TokenEmbeddings):
             extra_offset = len(start_marker)
             for sentence_text in text_sentences:
                 pad_by = longest_character_sequence_in_batch - len(sentence_text)
-                if self.is_forward_lm:
+                if self.model.is_forward_lm:
                     padded = "{}{}{}{}".format(
                         start_marker, sentence_text, end_marker, pad_by * " "
                     )
@@ -1845,22 +1943,22 @@ class FlairEmbeddings(TokenEmbeddings):
                 sentences_padded.append(padded)
 
             # get hidden states from language model
-            all_hidden_states_in_lm = self.lm.get_representation(
-                sentences_padded, self.chars_per_chunk
+            all_hidden_states_in_lm = self.model.lm.get_representation(
+                sentences_padded, self.model.chars_per_chunk
             )
 
             # take first or last hidden states from language model as word representation
-            for i, sentence in enumerate(sentences):
+            for i, sentence in enumerate(self.sentences):
                 sentence_text = sentence.to_tokenized_string()
 
                 offset_forward: int = extra_offset
                 offset_backward: int = len(sentence_text) + extra_offset
-
+                token_representation = list()
                 for token in sentence.tokens:
 
                     offset_forward += len(token.text)
 
-                    if self.is_forward_lm:
+                    if self.model.is_forward_lm:
                         offset = offset_forward
                     else:
                         offset = offset_backward
@@ -1873,22 +1971,16 @@ class FlairEmbeddings(TokenEmbeddings):
 
                     offset_backward -= len(token.text)
 
-                    if not self.fine_tune:
+                    if not self.model.fine_tune:
                         embedding = embedding.detach()
 
                     # only clone if optimization mode is 'gpu'
                     if flair.embedding_storage_mode == "gpu":
                         embedding = embedding.clone()
-
-                    token.set_embedding(self.name, embedding)
-
-            all_hidden_states_in_lm = all_hidden_states_in_lm.detach()
+                    token_representation.append(embedding)
+                    # token.set_embedding(self.model.name, embedding)
+                self.sentences_tokens.append(token_representation)
             del all_hidden_states_in_lm
-
-        return sentences
-
-    def __str__(self):
-        return self.name
 
 
 class PooledFlairEmbeddings(TokenEmbeddings):
