@@ -1,18 +1,19 @@
 #!python
 #cython: boundscheck=False, wraparound=False, nonecheck=False, language_level=3
 
-def check(dic, chunk):
-    return check_cython(dic, chunk)
+def get_char_index(dic, chunk):
+    return get_char_index_cython(dic, chunk)
 
-cdef list check_cython(dict dic, list chunk):
+cdef list get_char_index_cython(dict dic, list chunk):
     cdef list results = list()
-    cdef list char_indices = list()
-    cdef int encoded_c
+    cdef list char_indices
     cdef str text
     cdef str c
-    for text in chunk:
-        for c in text:
-            encoded_c = dic.get(c.encode("utf-8"), 0)
-            char_indices.append(encoded_c)
+    cdef int l = len(chunk)
+    cdef int index
+    for index in range(l):
+        char_indices = [dic.get(c.encode("utf-8"), 0) for c in chunk[index]]
         results.append(char_indices)
     return results
+
+

@@ -12,7 +12,7 @@ import flair
 from flair.data import Dictionary
 import pyximport
 pyximport.install()
-from flair.models.resolve_char_ids import check
+from flair.models.resolve_char_ids import get_char_index
 
 
 class LanguageModel(nn.Module):
@@ -120,7 +120,7 @@ class LanguageModel(nn.Module):
         # push each chunk through the RNN language model
         for chunk in chunks:
 
-            sequences_as_char_indices: List[List[int]] = check(self.dictionary.item2idx, chunk)
+            sequences_as_char_indices: List[List[int]] = get_char_index(self.dictionary.item2idx, chunk)
             # for string in chunk:
             #     char_indices = [
             #         self.dictionary.get_idx_for_item(char) for char in string
