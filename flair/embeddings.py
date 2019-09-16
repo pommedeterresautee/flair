@@ -1822,10 +1822,8 @@ class FlairEmbeddings(TokenEmbeddings):
             state = StoreState(model=self, sentences=sentences)
             for index_sentence, sentence in enumerate(sentences):
                 for index_token, token in enumerate(sentence.tokens):
-                    def promise():
-                        return state.get_token_embedding(index_sentence, index_token)
-
-                    token.set_embedding(self.name, promise)
+                    # capture index of sentence and token in the lambda
+                    token.set_embedding(self.name, lambda: state.get_token_embedding(index_sentence, index_token))
         return sentences
 
     def __str__(self):
