@@ -273,6 +273,7 @@ class SequenceTagger(flair.nn.Model):
                 batch_no += 1
 
                 with torch.no_grad():
+                    self.embeddings.embed(batch)
                     features = self.forward(batch)
                     loss = self._calculate_loss(features, batch)
                     tags, _ = self._obtain_labels(
@@ -407,8 +408,11 @@ class SequenceTagger(flair.nn.Model):
             #     for x in range(0, len(filtered_sentences), mini_batch_size)
             # ]
 
-            dataset = LmDataset(sentences)
-            batches = data.DataLoader(dataset, batch_size=mini_batch_size, shuffle=False, num_workers=1)
+            def collate(l):
+                return l
+
+            dataset = LmDataset(sentences, self)
+            batches = data.DataLoader(dataset, batch_size=mini_batch_size, shuffle=False, num_workers=0, collate_fn=collate)
 
             # progress bar for verbosity
             if verbose:
@@ -443,9 +447,6 @@ class SequenceTagger(flair.nn.Model):
 
     def forward(self, sentences: List[Sentence]):
         self.zero_grad()
-
-        self.embeddings.embed(sentences)
-
         lengths: List[int] = [len(sentence.tokens) for sentence in sentences]
         longest_token_sequence_in_batch: int = max(lengths)
 
@@ -960,11 +961,15 @@ class SequenceTagger(flair.nn.Model):
 
 class LmDataset(data.Dataset):
 
-    def __init__(self, sentences: List[Sentence]):
+    def __init__(self, sentences: List[Sentence], model):
         self.sentences = sentences
+        self.model = model
 
     def __len__(self):
         return len(self.sentences)
 
     def __getitem__(self, index):
-        return self.sentences[index]
+        sentences = self.sentences[index]
+        self.model.embeddings.embed(sentences)
+        return sentences
+
