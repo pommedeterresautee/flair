@@ -340,7 +340,7 @@ class WordEmbeddings(TokenEmbeddings):
             word_embedding = np.zeros(self.embedding_length, dtype="float")
 
         word_embedding = torch.tensor(
-            word_embedding, device=flair.device, dtype=torch.float
+            word_embedding, dtype=torch.float
         )
         return word_embedding
 
@@ -1865,7 +1865,7 @@ class StoreState:
         self.batches, self.chunks = self.model.lm.prepare_batches(
             strings=sentences_padded, chars_per_chunk=self.model.chars_per_chunk
         )
-        self.batches = self.model.lm.move_batches(batches=self.batches)
+
 
     def get_token_embedding(
         self, index_sentence: int, index_token: int
@@ -1876,10 +1876,11 @@ class StoreState:
             del self.sentences
             del self.batches
             del self.extra_offset
-        return self.sentences_tokens[index_sentence][index_token]
+        return self.sentences_tokens[index_sentence][index_token].to(flair.device, pin_memory=True, non_blocking=True)
 
     def perform(self) -> None:
         # get hidden states from language model
+        self.batches = self.model.lm.move_batches(batches=self.batches)
         all_hidden_states_in_lm = self.model.lm.compute_representation(
             batches=self.batches, chunks=self.chunks
         )
