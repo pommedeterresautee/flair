@@ -99,8 +99,7 @@ class LanguageModel(nn.Module):
             weight.new(self.nlayers, bsz, self.hidden_size).zero_().clone().detach(),
         )
 
-    def get_representation(self, strings: List[str], chars_per_chunk: int = 512):
-
+    def prepare_batches(self, strings: List[str], chars_per_chunk: int = 512) -> Tuple[List[torch.Tensor], List[List[str]]]:
         # cut up the input into chunks of max charlength = chunk_size
         longest = len(strings[0])
         chunks = []
@@ -110,9 +109,8 @@ class LanguageModel(nn.Module):
             splice_begin = splice_end
 
         chunks.append([text[splice_begin:longest] for text in strings])
-        hidden = self.init_hidden(len(chunks[0]))
 
-        output_parts = []
+        batches = []
 
         # push each chunk through the RNN language model
         for chunk in chunks:
@@ -125,17 +123,35 @@ class LanguageModel(nn.Module):
                 sequences_as_char_indices.append(char_indices)
 
             batch = torch.tensor(
-                sequences_as_char_indices, dtype=torch.long, device=flair.device
+                sequences_as_char_indices, dtype=torch.long
             ).transpose(0, 1)
+            batches.append(batch)
 
+        return batches, chunks
+
+    @staticmethod
+    def move_batches(batches: List[torch.tensor]) -> List[torch.Tensor]:
+        for index in range(len(batches)):
+            batches[index] = batches[index].to(flair.device)
+        return batches
+
+    def compute_representation(self, batches: List[torch.tensor], chunks: List[List[str]]):
+        hidden = self.init_hidden(len(chunks[0]))
+
+        output_parts = []
+        for batch in batches:
             _, rnn_output, hidden = self.forward(batch, hidden)
-
             output_parts.append(rnn_output)
-
-        # concatenate all chunks to make final output
+            # concatenate all chunks to make final output
         output = torch.cat(output_parts)
 
         return output
+
+    def get_representation(self, strings: List[str], chars_per_chunk: int = 512):
+        batches, chunks = self.prepare_batches(strings=strings, chars_per_chunk=chars_per_chunk)
+        batches = self.move_batches(batches=batches)
+        representations = self.compute_representation(batches=batches, chunks=chunks)
+        return representations
 
     def get_output(self, text: str):
         char_indices = [self.dictionary.get_idx_for_item(char) for char in text]
