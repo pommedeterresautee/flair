@@ -1876,7 +1876,7 @@ class StoreState:
             del self.sentences
             del self.batches
             del self.extra_offset
-        return self.sentences_tokens[index_sentence][index_token].to(flair.device, pin_memory=True, non_blocking=True)
+        return self.sentences_tokens[index_sentence][index_token].to(flair.device, non_blocking=True)
 
     def perform(self) -> None:
         # get hidden states from language model

@@ -238,7 +238,7 @@ class Token(DataPoint):
             self._embeddings[name] = vector
         elif type(vector) is torch.Tensor:
             # TODO reintroduce code to move to right device
-            self._embeddings[name] = lambda: vector.to(flair.device, pin_memory=True, non_blocking=True)
+            self._embeddings[name] = lambda: vector.to(flair.device, non_blocking=True)
         else:
             raise Exception("unsupported vector type")
 
