@@ -99,7 +99,9 @@ class LanguageModel(nn.Module):
             weight.new(self.nlayers, bsz, self.hidden_size).zero_().clone().detach(),
         )
 
-    def prepare_batches(self, strings: List[str], chars_per_chunk: int = 512) -> Tuple[List[torch.Tensor], List[List[str]]]:
+    def prepare_batches(
+        self, strings: List[str], chars_per_chunk: int = 512
+    ) -> Tuple[List[torch.Tensor], List[List[str]]]:
         # cut up the input into chunks of max charlength = chunk_size
         longest = len(strings[0])
         chunks = []
@@ -122,9 +124,9 @@ class LanguageModel(nn.Module):
                 ]
                 sequences_as_char_indices.append(char_indices)
 
-            batch = torch.tensor(
-                sequences_as_char_indices, dtype=torch.long
-            ).transpose(0, 1)
+            batch = torch.tensor(sequences_as_char_indices, dtype=torch.long).transpose(
+                0, 1
+            )
             batches.append(batch)
 
         return batches, chunks
@@ -135,7 +137,9 @@ class LanguageModel(nn.Module):
             batches[index] = batches[index].to(flair.device)
         return batches
 
-    def compute_representation(self, batches: List[torch.tensor], chunks: List[List[str]]):
+    def compute_representation(
+        self, batches: List[torch.tensor], chunks: List[List[str]]
+    ):
         hidden = self.init_hidden(len(chunks[0]))
 
         output_parts = []
@@ -148,7 +152,9 @@ class LanguageModel(nn.Module):
         return output
 
     def get_representation(self, strings: List[str], chars_per_chunk: int = 512):
-        batches, chunks = self.prepare_batches(strings=strings, chars_per_chunk=chars_per_chunk)
+        batches, chunks = self.prepare_batches(
+            strings=strings, chars_per_chunk=chars_per_chunk
+        )
         batches = self.move_batches(batches=batches)
         representations = self.compute_representation(batches=batches, chunks=chunks)
         return representations

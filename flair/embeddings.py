@@ -1823,7 +1823,10 @@ class FlairEmbeddings(TokenEmbeddings):
             for index_sentence, sentence in enumerate(sentences):
                 for index_token, token in enumerate(sentence.tokens):
                     # capture index of sentence and token in the lambda
-                    token.set_embedding(self.name, lambda: state.get_token_embedding(index_sentence, index_token))
+                    def promise(a=index_sentence, b=index_token):
+                        return state.get_token_embedding(a, b)
+
+                    token.set_embedding(self.name, promise)
         return sentences
 
     def __str__(self):
@@ -1836,14 +1839,6 @@ class StoreState:
         self.sentences = sentences
         self.sentences_tokens: List[List[torch.tensor]] = list()
 
-    def get_token_embedding(self, index_sentence: int, index_token: int) -> torch.Tensor:
-        if not self.sentences_tokens:
-            self.perform()
-            self.model = None
-            self.sentences = None
-        return self.sentences_tokens[index_sentence][index_token]
-
-    def perform(self) -> None:
         # if this is not possible, use LM to generate embedding. First, get text sentences
         text_sentences = [sentence.to_tokenized_string() for sentence in self.sentences]
 
@@ -1853,9 +1848,8 @@ class StoreState:
         sentences_padded: List[str] = []
 
         start_marker = "\n"
-
         end_marker = " "
-        extra_offset = len(start_marker)
+        self.extra_offset = len(start_marker)
         for sentence_text in text_sentences:
             pad_by = longest_character_sequence_in_batch - len(sentence_text)
             if self.model.is_forward_lm:
@@ -1868,19 +1862,34 @@ class StoreState:
                 )
             sentences_padded.append(padded)
 
-        batches, chunks = self.model.lm.prepare_batches(strings=sentences_padded,
-                                                        chars_per_chunk=self.model.chars_per_chunk)
-        batches = self.model.lm.move_batches(batches=batches)
+        self.batches, self.chunks = self.model.lm.prepare_batches(
+            strings=sentences_padded, chars_per_chunk=self.model.chars_per_chunk
+        )
+        self.batches = self.model.lm.move_batches(batches=self.batches)
 
+    def get_token_embedding(
+        self, index_sentence: int, index_token: int
+    ) -> torch.Tensor:
+        if not self.sentences_tokens:
+            self.perform()
+            del self.model
+            del self.sentences
+            del self.batches
+            del self.extra_offset
+        return self.sentences_tokens[index_sentence][index_token]
+
+    def perform(self) -> None:
         # get hidden states from language model
-        all_hidden_states_in_lm = self.model.lm.compute_representation(batches=batches, chunks=chunks)
+        all_hidden_states_in_lm = self.model.lm.compute_representation(
+            batches=self.batches, chunks=self.chunks
+        )
 
         # take first or last hidden states from language model as word representation
         for i, sentence in enumerate(self.sentences):
             sentence_text = sentence.to_tokenized_string()
 
-            offset_forward: int = extra_offset
-            offset_backward: int = len(sentence_text) + extra_offset
+            offset_forward: int = self.extra_offset
+            offset_backward: int = len(sentence_text) + self.extra_offset
             token_representation = list()
             for token in sentence.tokens:
 

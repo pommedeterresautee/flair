@@ -257,9 +257,9 @@ class Token(DataPoint):
         for name, vector in self._embeddings.items():
             if str(vector().device) != str(device):
                 if pin_memory:
-                    self._embeddings[name] = vector().to(
-                        device, non_blocking=True
-                    ).pin_memory()
+                    self._embeddings[name] = (
+                        vector().to(device, non_blocking=True).pin_memory()
+                    )
                 else:
                     self._embeddings[name] = vector.to(device, non_blocking=True)
 
