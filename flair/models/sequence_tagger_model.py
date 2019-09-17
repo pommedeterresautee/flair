@@ -412,7 +412,7 @@ class SequenceTagger(flair.nn.Model):
                 return l
 
             dataset = LmDataset(sentences, self)
-            batches = data.DataLoader(dataset, batch_size=mini_batch_size, shuffle=False, num_workers=0, collate_fn=collate)
+            batches = data.DataLoader(dataset, batch_size=mini_batch_size, shuffle=False, num_workers=0, collate_fn=collate, pin_memory=True)
 
             # progress bar for verbosity
             if verbose:
